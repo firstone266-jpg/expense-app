@@ -576,6 +576,13 @@ function bindAll(color, mr) {
         const key = id.replace("f-",""); state.form[key] = e.target.value;
       });
     });
+    q("btn-apply-toll")?.addEventListener("click", () => {
+      const t = state.distInfo?.tollEstimate || 0;
+      state.form.toll = String(t);
+      const el = q("f-toll"); if (el) el.value = t;
+      showToast(`已套用過路費 NT$${t}`);
+      render();
+    });
 
     q("btn-confirm")?.addEventListener("click", () => {
       const f = state.form;
