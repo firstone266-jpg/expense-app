@@ -75,6 +75,7 @@ let state = {
   showAddForm: false,
   waypoints: [],
   uploading: false,
+  editingId: null,
 };
 
 function tryParse(key, def) { try { return JSON.parse(localStorage.getItem(key) || "null") || def; } catch { return def; } }
@@ -135,7 +136,19 @@ function scheduleCalc() {
         const km = Math.round(legs.reduce((s,l) => s+l.distance.value, 0) / 1000);
         const sec = legs.reduce((s,l) => s+l.duration.value, 0);
         const min = Math.round(sec/60), h = Math.floor(min/60), m = min%60;
-        state.distInfo = { km, text: `${km} km`, dur: h>0?`${h} 小時 ${m} 分`:`${m} 分鐘`, legs };
+        // Extract highway distance from steps
+        let highwayM = 0;
+        const highwayKeywords = ["國道", "freeway", "expressway", "highway", "高速公路", "No.", "Fwy"];
+        legs.forEach(leg => {
+          (leg.steps || []).forEach(step => {
+            const instr = (step.html_instructions || "").toLowerCase();
+            const isHighway = highwayKeywords.some(k => (step.html_instructions || "").toLowerCase().includes(k.toLowerCase()));
+            if (isHighway) highwayM += step.distance.value;
+          });
+        });
+        const highwayKm = Math.round(highwayM / 1000);
+        const tollEstimate = Math.round(highwayKm * 1.3);
+        state.distInfo = { km, text: `${km} km`, dur: h>0?`${h} 小時 ${m} 分`:`${m} 分鐘`, legs, highwayKm, tollEstimate };
         state.form.mileage = String(km);
         state.distState = "done"; render();
       });
@@ -161,6 +174,7 @@ function render() {
     </div>
     ${renderNav(color)}
     ${state.showFavModal ? renderFavModal() : ""}
+    ${state.editingId ? renderEditModal(color) : ""}
     <div class="toast" id="toast"></div>
   `;
   bindAll(color, mr);
@@ -215,7 +229,10 @@ function renderList(mr, color) {
             <span style="font-size:14px;font-weight:600;color:#1e293b">${r.reason||"（無事由）"}</span>
             ${synced?'<span class="synced-tag">已上傳</span>':""}
           </div>
-          <button class="del-btn" data-id="${r.id}" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:20px;padding:0 4px">×</button>
+          <div style="display:flex;gap:4px">
+            <button class="edit-btn" data-id="${r.id}" style="background:none;border:none;cursor:pointer;color:#3b82f6;font-size:13px;padding:2px 8px;border-radius:6px;background:#eff6ff">✏️</button>
+            <button class="del-btn" data-id="${r.id}" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:20px;padding:0 4px">×</button>
+          </div>
         </div>
         <div style="margin-top:8px;font-size:12px;color:#64748b;line-height:1.9">
           ${stops.map((s,i)=>`<div>${i===0?"🚩":i===stops.length-1?"🏁":"📍"} ${s}</div>`).join("")}
@@ -355,6 +372,57 @@ function renderAddForm(color) {
     </div>`;
 }
 
+
+function renderEditModal(color) {
+  const r = state.records.find(r => r.id == state.editingId);
+  if (!r) return "";
+  const stops = [r.from, ...(r.waypoints||[]).map(w=>w.address), r.to];
+  return `
+    <div class="modal-overlay" id="edit-modal">
+      <div class="modal-bg" id="edit-bg"></div>
+      <div class="modal-box" style="max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:16px;font-weight:800;color:#1e293b">✏️ 編輯記錄</div>
+          <button id="edit-close" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer">×</button>
+        </div>
+        <div class="field">
+          <label class="label">日期</label>
+          <input class="input" type="date" id="e-date" value="${r.date}">
+        </div>
+        <div class="field">
+          <label class="label">出差事由</label>
+          <input class="input" type="text" id="e-reason" value="${r.reason||""}">
+        </div>
+        <div class="field">
+          <label class="label">出發地</label>
+          <input class="input" type="text" id="e-from" value="${r.from}">
+        </div>
+        ${(r.waypoints||[]).map((wp,i)=>`
+        <div class="field">
+          <label class="label">中間點 ${i+1}</label>
+          <input class="input" type="text" id="e-wp-${wp.id}" value="${wp.address}">
+        </div>`).join("")}
+        <div class="field">
+          <label class="label">目的地</label>
+          <input class="input" type="text" id="e-to" value="${r.to}">
+        </div>
+        <div class="field">
+          <label class="label">里程（km）</label>
+          <input class="input" type="number" id="e-mileage" value="${r.mileage}">
+        </div>
+        <div class="field">
+          <label class="label">停車費（NT$）</label>
+          <input class="input" type="number" id="e-parking" value="${r.parking||0}">
+        </div>
+        <div class="field">
+          <label class="label">過路費（NT$）</label>
+          <input class="input" type="number" id="e-toll" value="${r.toll||0}">
+        </div>
+        <button id="btn-save-edit" class="btn btn-primary" style="background:linear-gradient(135deg,${color},${color}bb);margin-top:4px">儲存</button>
+      </div>
+    </div>`;
+}
+
 function renderNav(color) {
   return `
     <div class="bottom-nav">
@@ -419,6 +487,31 @@ function bindAll(color, mr) {
   document.querySelectorAll(".del-btn").forEach(b => b.addEventListener("click", () => {
     state.records = state.records.filter(r => r.id != b.dataset.id); save(); showToast("已刪除"); render();
   }));
+  document.querySelectorAll(".edit-btn").forEach(b => b.addEventListener("click", () => {
+    state.editingId = Number(b.dataset.id); render();
+  }));
+  q("edit-close")?.addEventListener("click", () => { state.editingId = null; render(); });
+  q("edit-bg")?.addEventListener("click", () => { state.editingId = null; render(); });
+  q("btn-save-edit")?.addEventListener("click", () => {
+    const idx = state.records.findIndex(r => r.id == state.editingId);
+    if (idx === -1) return;
+    const r = state.records[idx];
+    r.date = q("e-date")?.value || r.date;
+    r.reason = q("e-reason")?.value || "";
+    r.from = q("e-from")?.value || r.from;
+    r.to = q("e-to")?.value || r.to;
+    r.mileage = Number(q("e-mileage")?.value || r.mileage);
+    r.parking = Number(q("e-parking")?.value || 0);
+    r.toll = Number(q("e-toll")?.value || 0);
+    (r.waypoints||[]).forEach(wp => {
+      const el = q("e-wp-" + wp.id);
+      if (el) wp.address = el.value;
+    });
+    // mark as unsynced since edited
+    state.syncedIds = state.syncedIds.filter(id => id != state.editingId);
+    state.editingId = null;
+    save(); showToast("✅ 已儲存"); render();
+  });
   q("btn-upload")?.addEventListener("click", handleUpload);
   q("btn-export")?.addEventListener("click", handleExport);
 
