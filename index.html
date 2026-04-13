@@ -29,7 +29,7 @@
   .fav-chip { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 20px; color: #2563eb; font-size: 11px; font-weight: 600; padding: 3px 10px; cursor: pointer; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: #fff; border-top: 1px solid #e2e8f0; display: flex; align-items: center; padding: 8px 0 18px; z-index: 100; }
   .nav-btn { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; flex: 1; padding: 0; }
-  .fab { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; border-radius: 50%; border: 3px solid #fff; color: #fff; font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(37,99,235,0.4); }
+  .fab { width: 52px; height: 52px; border-radius: 50%; border: none; color: #fff; font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(37,99,235,0.4); }
   .modal-overlay { position: fixed; inset: 0; z-index: 500; display: flex; align-items: flex-end; justify-content: center; }
   .modal-bg { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
   .modal-box { position: relative; background: #fff; border-radius: 20px 20px 0 0; padding: 20px 18px 32px; width: 100%; max-width: 430px; max-height: 80vh; display: flex; flex-direction: column; z-index: 1; }
@@ -141,8 +141,8 @@ function scheduleCalc() {
         // 用「收費路段」標記抓高速/高架收費路段
         legs.forEach(leg => {
           (leg.steps || []).forEach(step => {
-            const instr = step.html_instructions || "";
-            const isToll = instr.includes("收費路段") || instr.includes("國道") || instr.includes("高架道路");
+            const instr = step.html_instructions || step.instructions || "";
+            const isToll = instr.includes("收費路段") || instr.includes("國道") || instr.includes("高架道路") || instr.includes("收費");
             if (isToll) highwayM += step.distance.value;
           });
         });
