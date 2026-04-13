@@ -138,12 +138,12 @@ function scheduleCalc() {
         const min = Math.round(sec/60), h = Math.floor(min/60), m = min%60;
         // Extract highway distance from steps
         let highwayM = 0;
-        const highwayKeywords = ["國道", "freeway", "expressway", "highway", "高速公路", "No.", "Fwy"];
+        // 用「收費路段」標記抓高速/高架收費路段
         legs.forEach(leg => {
           (leg.steps || []).forEach(step => {
-            const instr = (step.html_instructions || "").toLowerCase();
-            const isHighway = highwayKeywords.some(k => (step.html_instructions || "").toLowerCase().includes(k.toLowerCase()));
-            if (isHighway) highwayM += step.distance.value;
+            const instr = step.html_instructions || "";
+            const isToll = instr.includes("收費路段") || instr.includes("國道") || instr.includes("高架道路");
+            if (isToll) highwayM += step.distance.value;
           });
         });
         const highwayKm = Math.round(highwayM / 1000);
