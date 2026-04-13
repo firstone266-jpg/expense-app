@@ -132,17 +132,16 @@ function scheduleCalc() {
         unitSystem: google.maps.UnitSystem.METRIC,
       }, (res, status) => {
         if (status !== "OK") { state.distState = "error"; render(); return; }
-        const legs = res.routes[0].legs;
+        const legsRaw = res.routes[0].legs;
+        const legs = JSON.parse(JSON.stringify(legsRaw));
         const km = Math.round(legs.reduce((s,l) => s+l.distance.value, 0) / 1000);
         const sec = legs.reduce((s,l) => s+l.duration.value, 0);
         const min = Math.round(sec/60), h = Math.floor(min/60), m = min%60;
-        // Extract highway distance from steps
         let highwayM = 0;
-        // 用「收費路段」標記抓高速/高架收費路段
         legs.forEach(leg => {
           (leg.steps || []).forEach(step => {
             const instr = step.html_instructions || step.instructions || "";
-            const isToll = instr.includes("收費路段") || instr.includes("國道") || instr.includes("高架道路") || instr.includes("收費");
+            const isToll = instr.includes("收費路段") || instr.includes("國道") || instr.includes("高架道路");
             if (isToll) highwayM += step.distance.value;
           });
         });
